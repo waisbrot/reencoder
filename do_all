@@ -1,0 +1,1 @@
+find video -type f -print -exec reencode.py --file '{}' \;
