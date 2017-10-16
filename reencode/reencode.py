@@ -12,20 +12,25 @@ ScanResult = namedtuple('ScanResult',
                         ['source', 'source_dir', 'source_basename', 'scale_arg', 'audio_bitrate', 'temp_out', 'temp_dir'])
 
 
+class IgnoreFileException(Exception):
+    pass
+
+
 def process(file_, bitrate, width, queue):
-    scan_result = scan_file(file_, bitrate, width, queue)
-    reencode(scan_result, queue)
-    cleanup(queue)
+    try:
+        scan_result = scan_file(file_, bitrate, width, queue)
+        reencode(scan_result, queue)
+        cleanup(queue)
+    except IgnoreFileException:
+        pass
+    except subprocess.CalledProcessError:
+        queue.put({'status': 'error'})
 
 
 def scan_file(file_, bitrate, width, queue):
     source = file_
     queue.put({'file': path.basename(source), 'status': 'scanning'})
     (_, ext) = path.splitext(source)
-
-    if ext in ['nfo', 'sub', 'idx', 'txt']:
-        queue.put({'status': 'not video'})
-        sys.exit(0)
 
     (source_basename, _) = path.splitext(path.basename(source))
     source_dir = path.dirname(source)
@@ -37,19 +42,19 @@ def scan_file(file_, bitrate, width, queue):
 
     if not source_info["MIMEType"].startswith("video/"):
         queue.put({'status': 'not video'})
-        sys.exit(0)
+        raise IgnoreFileException()
 
     if "DisplayWidth" not in source_info:
-        [width, height] = source_info["ImageSize"].split('x')
-        source_info["DisplayWidth"] = width
-        source_info["DisplayHeight"] = height
+        [w, h] = source_info["ImageSize"].split('x')
+        source_info["DisplayWidth"] = w
+        source_info["DisplayHeight"] = h
 
     probe_data = json.loads(subprocess.check_output(['ffprobe', '-show_format', '-of', 'json', source], stderr=subprocess.DEVNULL).decode('utf-8'))
     is_low_bitrate = int(probe_data["format"]["bit_rate"]) < (video_bitrate + 500000)
     is_hevc = "CompressorID" in source_info and source_info["CompressorID"] == "hev1"
     if is_hevc and is_low_bitrate:
         queue.put({'status': 'already a low bit-rate HEVC'})
-        sys.exit(0)
+        raise IgnoreFileException()
 
     scale_arg = "scale=0:0"
     origin_width = int(source_info["DisplayWidth"])

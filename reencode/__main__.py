@@ -2,12 +2,9 @@ import multiprocessing
 import argparse
 import os.path
 import os
-import fnmatch
+from fnmatch import fnmatch
 from . import progress
 from . import reencode
-
-
-queue = multiprocessing.Queue()
 
 
 def parse_args():
@@ -22,14 +19,27 @@ def parse_args():
     return parser.parse_args()
 
 
+def filter_ignored(files, patterns):
+    for f in files:
+        ok = True
+        for p in patterns:
+            if fnmatch(f, p):
+                ok = False
+                break
+        if ok:
+            yield f
+
 try:
     args = parse_args()
-    progress.start_pbar()
+    print("{}".format(args))
+    queue = multiprocessing.Queue()
+    progress.start_pbar(queue)
     if os.path.isdir(args.file):
         for root, dirs, files in os.walk(args.file):
-            for f in fnmatch.filter(files, args.ignored_patterns):
+            for f in filter_ignored(files, args.ignored_patterns):
                 reencode.process(os.path.join(root, f), args.bitrate, args.width, queue)
-            dirs = fnmatch.filter(dirs, args.ignored_patterns)
+                queue.put('next')
+            dirs = list(filter_ignored(dirs, args.ignored_patterns))
     else:
         reencode.process(args.file, args.bitrate, args.width, queue)
 finally:

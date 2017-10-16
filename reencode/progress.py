@@ -15,7 +15,12 @@ def start_pbar(queue):
             pbar.update()
             try:
                 message = q.get(True, 1)
-                pmessage.update_mapping(**message)
+                if message == 'next':
+                    pbar.finish()
+                    pmessage.update_mapping(file='none', status='idle')
+                    pbar = progressbar.ProgressBar(widgets=widgets, max_value=progressbar.UnknownLength)
+                else:
+                    pmessage.update_mapping(**message)
             except Exception:
                 pass
     process = multiprocessing.Process(target=run_pbar, args=(queue,), daemon=True)
