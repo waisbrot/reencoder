@@ -6,6 +6,10 @@ import subprocess
 import shutil
 import os
 from collections import namedtuple
+import logging
+
+
+log = logging.getLogger('reencoder')
 
 
 ScanResult = namedtuple('ScanResult',
@@ -24,6 +28,8 @@ def process(file_, bitrate, width, queue):
     except IgnoreFileException:
         pass
     except subprocess.CalledProcessError:
+        queue.put({'status': 'error'})
+    except Exception:
         queue.put({'status': 'error'})
 
 
@@ -94,13 +100,18 @@ def reencode(scan, queue):
         scan.temp_out,
     ]
     queue.put({'status': 'encoding'})
+    log.debug('--> %s', ' '.join(command))
     subprocess.check_call(command, cwd=scan.temp_dir, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
 def cleanup(scan, queue):
     queue.put({'status': 'cleanup'})
     dest_file = '{}/{}.mp4'.format(scan.source_dir, scan.source_basename)
+    log.debug('copy %s -> %s', scan.temp_out, dest_file)
     shutil.copyfile(scan.temp_out, dest_file)
-    os.remove(scan.source)
+    if not os.path.samefile(scan.source, dest_file):
+        log.debug('remove old video %s', scan.source)
+        os.remove(scan.source)
+    log.debug('remove tempdir %s', scan.temp_dir)
     shutil.rmtree(scan.temp_dir)
     queue.put({'status': 'done'})

@@ -4,7 +4,7 @@ import multiprocessing
 
 def start_pbar(queue):
     def run_pbar(q):
-        pmessage = progressbar.FormatCustomText('File: %(file)s -- %(status)s', dict(file='none', status='idle'))
+        pmessage = progressbar.FormatCustomText('File: %(file).50s -- %(status)s', dict(file='none', status='idle'))
         widgets = [
             progressbar.AnimatedMarker(),
             ' :: ', pmessage, ' :: ',

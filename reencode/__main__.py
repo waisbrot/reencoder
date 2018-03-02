@@ -5,6 +5,40 @@ import os
 from fnmatch import fnmatch
 from . import progress
 from . import reencode
+import logging
+import logging.config
+import logging.handlers
+
+logging.config.dictConfig({
+    'version': 1,
+    'formatters': {
+        'file_formatter': {
+            'format': '%(asctime)s %(levelname)-8s %(name)-15s %(message)s',
+            'datefmt': '%Y-%m-%dT%H:%M:%S',
+        }
+    },
+    'filters': {},
+    'handlers': {
+        'file': {
+            'class': 'logging.handlers.RotatingFileHandler',
+            'level': 'DEBUG',
+            'formatter': 'file_formatter',
+            'filename': 'reencode.debug.log',
+            'maxBytes': 1024*1024,
+            'backupCount': 1,
+            'mode': 'w',
+        }
+    },
+    'loggers': {},
+    'root': {
+        'level': 'DEBUG',
+        'handlers': ['file']
+    },
+    'incremental': False,
+    'disable_existing_loggers': False,
+})
+
+log = logging.getLogger('main')
 
 
 def parse_args():
@@ -31,7 +65,7 @@ def filter_ignored(files, patterns):
 
 try:
     args = parse_args()
-    print("{}".format(args))
+    log.info("Inital arguments: {}".format(args))
     queue = multiprocessing.Queue()
     progress.start_pbar(queue)
     if os.path.isdir(args.file):
