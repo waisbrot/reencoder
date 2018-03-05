@@ -49,7 +49,7 @@ def parse_args():
     parser.add_argument('--encoding', type=str, required=False, default='h265', choices=['h264', 'h265'], help="Video encoding. Either h264 or h265")
     parser.add_argument('--bitrate', type=int, required=False, default=2000000, help="Video bit-rate")
     parser.add_argument('--file', type=str, required=True, help="File to re-encode")
-    parser.add_argument('--ignored-patterns', type=split_list, required=False, default=['*.nfo', '*.sub', '*.idx', '*.txt', '.*'], help='Comma-separated list of Unix file-glob patterns to ignore')
+    parser.add_argument('--ignored-patterns', type=split_list, required=False, default=['*.nfo', '*.sub', '*.idx', '*.txt', '.*', '*.url', '*.jpg'], help='Comma-separated list of Unix file-glob patterns to ignore')
     return parser.parse_args()
 
 

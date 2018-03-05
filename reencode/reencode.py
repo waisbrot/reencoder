@@ -28,8 +28,10 @@ def process(file_, bitrate, width, queue):
     except IgnoreFileException:
         pass
     except subprocess.CalledProcessError:
+        log.exception('CalledProcessError')
         queue.put({'status': 'error'})
     except Exception:
+        log.exception('Error processing file')
         queue.put({'status': 'error'})
 
 
@@ -67,9 +69,9 @@ def scan_file(file_, bitrate, width, queue):
     origin_height = int(source_info["DisplayHeight"])
     if origin_width > width:
         factor = width / origin_width
-        target_height = int(origin_height * factor)
-        if target_height != 0:
-            target_height = target_height + 1
+        target_height = -1 #int(origin_height * factor)
+        #if target_height != 0:
+        #    target_height = target_height + 1
         scale_arg = "scale={}:{}".format(width, target_height)
     return ScanResult(
         source=source,
