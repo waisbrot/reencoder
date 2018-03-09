@@ -9,36 +9,53 @@ import logging
 import logging.config
 import logging.handlers
 
-logging.config.dictConfig({
-    'version': 1,
-    'formatters': {
-        'file_formatter': {
-            'format': '%(asctime)s %(levelname)-8s %(name)-15s %(message)s',
-            'datefmt': '%Y-%m-%dT%H:%M:%S',
-        }
-    },
-    'filters': {},
-    'handlers': {
-        'file': {
-            'class': 'logging.handlers.RotatingFileHandler',
-            'level': 'DEBUG',
-            'formatter': 'file_formatter',
-            'filename': 'reencode.debug.log',
-            'maxBytes': 1024*1024,
-            'backupCount': 1,
-            'mode': 'w',
-        }
-    },
-    'loggers': {},
-    'root': {
-        'level': 'DEBUG',
-        'handlers': ['file']
-    },
-    'incremental': False,
-    'disable_existing_loggers': False,
-})
+log = None
+def configure_logging(args):
+    if args.verbose == 1:
+        level = 'INFO'
+    elif args.verbose >= 2:
+        level = 'DEBUG'
 
-log = logging.getLogger('main')
+    if args.live_progress:
+        handler = 'file'
+    else:
+        handler = 'stream'
+
+    logging.config.dictConfig({
+        'version': 1,
+        'formatters': {
+            'file_formatter': {
+                'format': '%(asctime)s %(levelname)-8s %(name)-15s %(message)s',
+                'datefmt': '%Y-%m-%dT%H:%M:%S',
+            }
+        },
+        'filters': {},
+        'handlers': {
+            'file': {
+                'class': 'logging.handlers.RotatingFileHandler',
+                'level': 'DEBUG',
+                'formatter': 'file_formatter',
+                'filename': 'reencode.debug.log',
+                'maxBytes': 1024*1024,
+                'backupCount': 1,
+                'mode': 'w',
+            },
+            'stream': {
+                'class': 'logging.StreamHandler',
+                'level': 'DEBUG',
+                'formatter': 'file_formatter',
+            },
+        },
+        'loggers': {},
+        'root': {
+            'level': level,
+            'handlers': [handler],
+        },
+        'incremental': False,
+        'disable_existing_loggers': False,
+    })
+    global log
+    log = logging.getLogger('main')
 
 
 def parse_args():
@@ -49,6 +66,7 @@ def parse_args():
     parser.add_argument('--encoding', type=str, required=False, default='h265', choices=['h264', 'h265'], help="Video encoding. Either h264 or h265")
     parser.add_argument('--bitrate', type=int, required=False, default=2000000, help="Video bit-rate")
     parser.add_argument('--live-progress', required=False, action='store_false', help="Avoid showing the live progress bar and instead just print a line?")
+    parser.add_argument('--verbose', '-v', required=False, action='count', help="Log level (start at warning)")
     parser.add_argument('--file', type=str, required=True, help="File to re-encode")
     parser.add_argument('--ignored-patterns', type=split_list, required=False,
                         default=['*.nfo', '*.sub', '*.idx', '*.txt', '.*', '*.url', '*.jpg', '*.zip', '*.sfv', '*.srr'],
@@ -69,6 +87,7 @@ def filter_ignored(files, patterns):
 
 try:
     args = parse_args()
+    configure_logging(args)
     log.info("Inital arguments: {}".format(args))
     queue = multiprocessing.Queue()
     progress.start_pbar(queue, args.live_progress)
