@@ -71,7 +71,7 @@ def parse_args():
     parser.add_argument('--verbose', '-v', required=False, default=0, action='count', help="Log level (start at warning)")
     parser.add_argument('--file', type=str, required=True, help="File to re-encode")
     parser.add_argument('--ignored-patterns', type=split_list, required=False,
-                        default=['*.nfo', '*.sub', '*.idx', '*.txt', '.*', '*.url', '*.jpg', '*.zip', '*.sfv', '*.srr'],
+                        default=['*.nfo', '*.sub', '*.idx', '*.txt', '.*', '*.url', '*.jpg', '*.zip', '*.sfv', '*.srr', '*.nzb', '*.diz'],
                         help='Comma-separated list of Unix file-glob patterns to ignore')
     return parser.parse_args()
 
