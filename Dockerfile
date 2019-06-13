@@ -1,13 +1,14 @@
-FROM jrottenberg/ffmpeg:3.4-centos
-LABEL maintainer="code@waisbrot.net" \
-      name="reencode" \
-      vendor="code@waisbrot.net"
-WORKDIR /opt/reencode
-RUN yum install -q -y epel-release
-RUN yum install -q -y perl-Image-ExifTool
-RUN yum install -q -y python34 python34-pip
-ENTRYPOINT ["python3", "-m", "reencode"]
-ADD requirements.txt .
-RUN pip3 install -r requirements.txt
-ADD . .
-EXPOSE 8081
+FROM rust:1.34 as dependencies
+WORKDIR /usr/src/app
+COPY Cargo.toml Cargo.lock ./
+RUN mkdir src && echo "fn main() {}" > src/main.rs
+RUN cargo build
+
+FROM rust:1.34 as build
+RUN apt-get update && apt-get install -q -y ffmpeg
+COPY --from=dependencies /usr/src/app/Cargo.toml /usr/src/app/Cargo.lock ./
+COPY --from=dependencies /usr/local/cargo /usr/local/cargo
+COPY . .
+RUN cargo install --path .
+ENV RUST_BACKTRACE=1 RUST_LOG=scan_to_postgres=info
+CMD /usr/local/cargo/bin/scan-to-postgres
