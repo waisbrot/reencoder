@@ -7,83 +7,99 @@ extern crate pretty_env_logger;
 extern crate subprocess;
 extern crate serde_json;
 extern crate regex;
+extern crate clap;
 
-mod file;
-mod ffprobe;
+mod scan;
+mod clean;
 
 use std::io;
-use std::fs::{self, DirEntry};
-use std::path::Path;
 use postgres::{Connection, TlsMode};
-use file::ScannedFile;
-use std::time::Duration;
-use std::thread::sleep;
+use postgres::params::Builder;
+use postgres::params::Host::Tcp;
+use clap::{Arg, App};
+use std::thread;
 
-// code from the Rust book
-fn visit_dirs(dir: &Path, visitor: &Fn(&DirEntry) -> io::Result<()>) -> io::Result<()> {
-    for entry in fs::read_dir(dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_dir() {
-            visit_dirs(&path, visitor)?;
-        } else {
-            let metadata = path.symlink_metadata()?;
-            let file_type = metadata.file_type();
-            if file_type.is_symlink() {
-                continue
-            } else {
-                visitor(&entry)?;
-            }
-        }
-    }
-    Ok(())
+fn modules_contains(modules: &clap::Values, target: &str) -> bool {
+    modules.clone().filter(|&x| x == target).next().is_some()
 }
 
-fn scan(root: &String, connection: &Connection) -> io::Result<()> {
-    let visitor = |dir: &DirEntry| -> io::Result<()> {
-        let path = dir.path();
-        let path = path.as_path();
-        let file = ScannedFile::new(path, &connection)?;
-        let result = file.store(&connection);
-        match result {
-            Ok(i) => {
-                debug!("Wrote {} rows for {}", &i, &file.path);
-                Ok(())
-            },
-            Err(e) => {
-                warn!("Error {} while trying to store file {:?}", &e, &file);
-                Ok(())
-            }
-        }
-    };
-    let root_path = Path::new(root);
-    if root_path.is_dir() {
-        info!("Scanning from {}", &root);
-        visit_dirs(Path::new(root), &visitor)?;
+fn spawn_scan(postgres_config: &postgres::params::ConnectParams, modules: &clap::Values) -> Option<thread::JoinHandle<io::Result<()>>> {
+    if modules_contains(modules, "scan") {
+        let connection = Connection::connect(postgres_config.clone(), TlsMode::None).unwrap();
+        let handle = thread::Builder::new()
+            .name("scan".to_string())
+            .spawn(move || {
+                scan::scan_loop(&connection)
+            }).unwrap();
+        Some(handle)
     } else {
-        warn!("Root path {} does not appear to be a directory", &root);
+        None
     }
-    Ok(())
 }
 
-fn scan_all(connection: &Connection) -> io::Result<()> {
-    let mut i = 0;
-    for row in &connection.query("SELECT root FROM roots WHERE active ORDER BY root ASC", &[]).unwrap() {
-        let root: String = row.get(0);
-        scan(&root, connection)?;
-        i += 1;
+fn spawn_clean(postgres_config: &postgres::params::ConnectParams, modules: &clap::Values) -> Option<thread::JoinHandle<io::Result<()>>> {
+    if modules_contains(modules, "clean") {
+        let connection = Connection::connect(postgres_config.clone(), TlsMode::None).unwrap();
+        let handle = thread::Builder::new()
+            .name("clean".to_string())
+            .spawn(move || {
+                clean::clean_loop(&connection)
+            }).unwrap();
+        Some(handle)
+    } else {
+        None
     }
-    info!("Scanned {} roots", &i);
-    Ok(())
 }
 
 fn main() -> io::Result<()> {
     pretty_env_logger::init();
 
-    let connection = Connection::connect("postgres://media:media@tularemia.local", TlsMode::None)?;
-    let interval = Duration::from_secs(60 * 60);
-    loop {
-        scan_all(&connection)?;
-        sleep(interval);
-    }
+    let args = App::new("Video converter")
+        .version("0.1")
+        .author("Nathaniel Waisbrot")
+        .about("Find and convert video to hvec")
+        .arg(Arg::with_name("username")
+             .help("Postgres username")
+             .long("username")
+             .takes_value(true)
+             .required(true))
+        .arg(Arg::with_name("password")
+             .help("Postgres password")
+             .long("password")
+             .takes_value(true)
+             .required(true))
+        .arg(Arg::with_name("host")
+             .help("Postgres hostname")
+             .long("host")
+             .takes_value(true)
+             .required(true))
+        .arg(Arg::with_name("modules")
+             .help("Modules to activate")
+             .long("modules")
+             .required(false)
+             .takes_value(true)
+             .multiple(true)
+             .require_delimiter(true)
+             .default_value("scan,clean"))
+        .get_matches();
+
+    let postgres_config = Builder::new()
+        .user(args.value_of("username").unwrap(), args.value_of("password"))
+        .build(Tcp(args.value_of("host").unwrap().to_string()));
+
+    let modules = args.values_of("modules").unwrap();
+
+    let scan_thread = spawn_scan(&postgres_config, &modules);
+    let clean_thread = spawn_clean(&postgres_config, &modules);
+
+    match scan_thread {
+        Some(handle) => handle.join().unwrap(),
+        None => Ok(())
+    }?;
+    match clean_thread {
+        Some(handle) => handle.join().unwrap(),
+        None => Ok(())
+    }?;
+    info!("All modules have been skipped or failed. END OF LINE");
+    Ok(())
 }

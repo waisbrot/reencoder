@@ -10,7 +10,7 @@ use std::cmp::{min, max};
 use std::io::Result;
 use std::io::Read;
 use crypto::digest::Digest;
-use crate::ffprobe;
+use crate::scan::ffprobe;
 
 const FILE_SAMPLE_LENGTH: usize = 1024;
 

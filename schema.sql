@@ -28,3 +28,11 @@ CREATE TABLE paths (
        last_modified timestamp with time zone NOT NULL
        );
 CREATE UNIQUE INDEX paths_path ON paths (path);
+
+CREATE TABLE config (
+       service text PRIMARY KEY,
+       config jsonb NOT NULL
+);
+INSERT INTO config (service, config) VALUES ('scan', '{"interval":60}'::jsonb);
+INSERT INTO config (service, config) VALUES ('clean', '{"interval":60}'::jsonb);
+INSERT INTO config (service, config) VALUES ('convert', '{"interval":60}'::jsonb);

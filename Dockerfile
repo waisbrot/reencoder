@@ -11,4 +11,4 @@ COPY --from=dependencies /usr/local/cargo /usr/local/cargo
 COPY . .
 RUN cargo install --path .
 ENV RUST_BACKTRACE=1 RUST_LOG=scan_to_postgres=info
-CMD /usr/local/cargo/bin/scan-to-postgres
+ENTRYPOINT ["/usr/local/cargo/bin/scan-to-postgres"]
