@@ -4,8 +4,6 @@ mod ffprobe;
 use std::io;
 use std::path::Path;
 use std::fs::{self, DirEntry};
-use std::time::Duration;
-use std::thread::sleep;
 use file::ScannedFile;
 use postgres::Connection;
 
@@ -56,22 +54,19 @@ fn scan(root: &String, connection: &Connection) -> io::Result<()> {
     Ok(())
 }
 
-fn scan_all(connection: &Connection) -> io::Result<()> {
-    let mut i = 0;
-    for row in &connection.query("SELECT root FROM roots WHERE active ORDER BY root ASC", &[]).unwrap() {
-        let root: String = row.get(0);
-        scan(&root, connection)?;
-        i += 1;
+pub struct Scan {}
+impl crate::module::Module for Scan {
+    fn module_name(&self) -> &str {
+        "scan"
     }
-    info!("Scanned {} roots", &i);
-    Ok(())
-}
-
-pub fn scan_loop(connection: &Connection) -> io::Result<()> {
-    let interval_s: i32 = connection.query("SELECT (config->'interval')::int FROM config WHERE service = 'scan'", &[])?.get(0).get(0);
-    let interval = Duration::from_secs(interval_s as u64);
-    loop {
-        scan_all(&connection)?;
-        sleep(interval);
+    fn module_iteration(&self, connection: &Connection) -> io::Result<()> {
+        let mut i = 0;
+        for row in &connection.query("SELECT root FROM roots WHERE active ORDER BY root ASC", &[]).unwrap() {
+            let root: String = row.get(0);
+            scan(&root, connection)?;
+            i += 1;
+        }
+        info!("Scanned {} roots", &i);
+        Ok(())
     }
 }

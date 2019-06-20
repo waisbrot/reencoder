@@ -11,45 +11,13 @@ extern crate clap;
 
 mod scan;
 mod clean;
+mod module;
 
 use std::io;
-use postgres::{Connection, TlsMode};
 use postgres::params::Builder;
 use postgres::params::Host::Tcp;
 use clap::{Arg, App};
-use std::thread;
-
-fn modules_contains(modules: &clap::Values, target: &str) -> bool {
-    modules.clone().filter(|&x| x == target).next().is_some()
-}
-
-fn spawn_scan(postgres_config: &postgres::params::ConnectParams, modules: &clap::Values) -> Option<thread::JoinHandle<io::Result<()>>> {
-    if modules_contains(modules, "scan") {
-        let connection = Connection::connect(postgres_config.clone(), TlsMode::None).unwrap();
-        let handle = thread::Builder::new()
-            .name("scan".to_string())
-            .spawn(move || {
-                scan::scan_loop(&connection)
-            }).unwrap();
-        Some(handle)
-    } else {
-        None
-    }
-}
-
-fn spawn_clean(postgres_config: &postgres::params::ConnectParams, modules: &clap::Values) -> Option<thread::JoinHandle<io::Result<()>>> {
-    if modules_contains(modules, "clean") {
-        let connection = Connection::connect(postgres_config.clone(), TlsMode::None).unwrap();
-        let handle = thread::Builder::new()
-            .name("clean".to_string())
-            .spawn(move || {
-                clean::clean_loop(&connection)
-            }).unwrap();
-        Some(handle)
-    } else {
-        None
-    }
-}
+use module::Module;
 
 fn main() -> io::Result<()> {
     pretty_env_logger::init();
@@ -89,17 +57,17 @@ fn main() -> io::Result<()> {
 
     let modules = args.values_of("modules").unwrap();
 
-    let scan_thread = spawn_scan(&postgres_config, &modules);
-    let clean_thread = spawn_clean(&postgres_config, &modules);
+    let scan_thread = scan::Scan{}.spawn_module(&postgres_config, &modules);
+    let clean_thread = clean::Clean{}.spawn_module(&postgres_config, &modules);
 
     match scan_thread {
         Some(handle) => handle.join().unwrap(),
-        None => Ok(())
-    }?;
+        None => ()
+    };
     match clean_thread {
         Some(handle) => handle.join().unwrap(),
-        None => Ok(())
-    }?;
+        None => ()
+    };
     info!("All modules have been skipped or failed. END OF LINE");
     Ok(())
 }
