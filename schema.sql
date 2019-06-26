@@ -48,16 +48,9 @@ INSERT INTO config (service, config) VALUES
 '{
   "interval": 60
 }'::jsonb);
-('convert',
+('reencode',
 '{
   "interval": 60,
-  "args": [
-    "-y",
-    "-c:v", "libx265",
-    "-crf", "28",
-    "-c:a", "aac",
-    "-hide_banner",
-    "-nostats",
-    "-v", "warning"
-  ]
+  "target_extension": "mkv",
+  "target_codec": "hevc"
 }'::jsonb);

@@ -8,9 +8,11 @@ extern crate subprocess;
 extern crate serde_json;
 extern crate regex;
 extern crate clap;
+extern crate crossbeam_utils;
 
 mod scan;
 mod clean;
+mod reencode;
 mod module;
 
 use std::io;
@@ -48,7 +50,7 @@ fn main() -> io::Result<()> {
              .takes_value(true)
              .multiple(true)
              .require_delimiter(true)
-             .default_value("scan,clean"))
+             .default_value("scan,clean,reencode"))
         .get_matches();
 
     let postgres_config = Builder::new()
@@ -57,17 +59,29 @@ fn main() -> io::Result<()> {
 
     let modules = args.values_of("modules").unwrap();
 
-    let scan_thread = scan::Scan{}.spawn_module(&postgres_config, &modules);
-    let clean_thread = clean::Clean{}.spawn_module(&postgres_config, &modules);
+    fn modules_contains(modules: &clap::Values, target: &str) -> bool {
+        modules.clone().filter(|&x| x == target).next().is_some()
+    }
 
-    match scan_thread {
-        Some(handle) => handle.join().unwrap(),
-        None => ()
-    };
-    match clean_thread {
-        Some(handle) => handle.join().unwrap(),
-        None => ()
-    };
+    let mut all_modules: Vec<&Module> = Vec::new();
+    all_modules.push(&scan::Scan{});
+    all_modules.push(&clean::Clean{});
+    all_modules.push(&reencode::Reencode{});
+    crossbeam_utils::thread::scope(|scope| {
+        for m in all_modules.iter() {
+            let name = m.module_name();
+            if modules_contains(&modules, name) {
+                let connection = postgres::Connection::connect(postgres_config.clone(), postgres::TlsMode::None).unwrap();
+                scope
+                    .builder()
+                    .name(name.to_string())
+                    .spawn(move |_| {
+                        m.module_loop(connection)
+                    }).unwrap();
+            }
+        }
+    }).unwrap();
+
     info!("All modules have been skipped or failed. END OF LINE");
     Ok(())
 }
