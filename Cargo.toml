@@ -1,8 +1,8 @@
 [package]
 name = "scan-to-postgres"
-version = "0.1.0"
+version = "1.0.0"
 authors = ["Nathaniel Waisbrot <nathaniel@waisbrot.net>"]
-edition = "2019"
+edition = "2018"
 
 [dependencies]
 rust-crypto = "^0.2"
