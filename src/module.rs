@@ -1,16 +1,22 @@
 use postgres::Connection;
-use std::io;
 use std::thread::sleep;
 use std::time::Duration;
+use std::time::SystemTime;
+use cadence::StatsdClient;
+use cadence::prelude::*;
 
 pub trait Module where Self: std::marker::Sync {
     fn module_name(&self) -> &str;
-    fn module_iteration(&self, connection: &Connection) -> io::Result<()>;
-    fn module_loop(&self, connection: Connection) -> () {
+    fn module_iteration(&self, connection: &Connection, statsd: &StatsdClient) -> ();
+    fn module_loop(&self, connection: Connection, statsd: StatsdClient) -> () {
+        let zero = Duration::from_secs(0);
         loop {
             let interval_s = self.config_int(&connection, "interval");
             let interval = Duration::from_secs(interval_s as u64);
-            self.module_iteration(&connection).unwrap();
+            let iteration_start = SystemTime::now();
+            self.module_iteration(&connection, &statsd);
+            let iteration_duration = iteration_start.elapsed().unwrap_or(zero);
+            statsd.time_duration("loop_time", iteration_duration).unwrap();
             sleep(interval);
         }
     }
