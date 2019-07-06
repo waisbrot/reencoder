@@ -1,35 +1,37 @@
+use regex::Regex;
 use std::io::Result;
+use std::str::FromStr;
 use subprocess::Exec;
 use subprocess::Redirection;
-use regex::Regex;
-use std::str::FromStr;
 
 trait ProbeResult {
-    fn unpack_probe_result(&self) -> Result<(Option<String>, Option<i32>, Option<i32>, Option<f32>)>;
+    fn unpack_probe_result(
+        &self,
+    ) -> Result<(Option<String>, Option<i32>, Option<i32>, Option<f32>)>;
 }
 
 impl ProbeResult for Option<serde_json::Value> {
-    fn unpack_probe_result(&self) -> Result<(Option<String>, Option<i32>, Option<i32>, Option<f32>)> {
+    fn unpack_probe_result(
+        &self,
+    ) -> Result<(Option<String>, Option<i32>, Option<i32>, Option<f32>)> {
         match self {
             None => Ok((None, None, None, None)),
-            Some(value) => value.unpack_probe_result()
+            Some(value) => value.unpack_probe_result(),
         }
     }
 }
 
 impl ProbeResult for serde_json::Value {
-    fn unpack_probe_result(&self) -> Result<(Option<String>, Option<i32>, Option<i32>, Option<f32>)> {
+    fn unpack_probe_result(
+        &self,
+    ) -> Result<(Option<String>, Option<i32>, Option<i32>, Option<f32>)> {
         let bit_rate = self.get("bit_rate").parse_bit_rate();
         let codec = match self.get("codec_name") {
-            None => {
-                None
+            None => None,
+            Some(codec_name) => match codec_name.as_str() {
+                None => None,
+                Some(str_string) => Some(str_string.to_string()),
             },
-            Some(codec_name) => {
-                match codec_name.as_str() {
-                    None => None,
-                    Some(str_string) => Some(str_string.to_string())
-                }
-            }
         };
         let height = option_downcast(self.get("height").unwrap().as_i64());
         let width = option_downcast(self.get("width").unwrap().as_i64());
@@ -44,7 +46,7 @@ pub fn probe(path: &String) -> Result<(Option<String>, Option<i32>, Option<i32>,
 fn option_downcast(value: Option<i64>) -> Option<i32> {
     match value {
         None => None,
-        Some(n) => Some(n as i32)
+        Some(n) => Some(n as i32),
     }
 }
 
@@ -55,12 +57,8 @@ trait HasBitRate {
 impl HasBitRate for Option<&serde_json::Value> {
     fn parse_bit_rate(&self) -> Option<f32> {
         match self {
-            None => {
-                None
-            },
-            Some(json_value) => {
-                json_value.parse_bit_rate()
-            }
+            None => None,
+            Some(json_value) => json_value.parse_bit_rate(),
         }
     }
 }
@@ -68,36 +66,27 @@ impl HasBitRate for Option<&serde_json::Value> {
 impl HasBitRate for serde_json::Value {
     fn parse_bit_rate(&self) -> Option<f32> {
         match self.as_str() {
-            None => {
-                None
-            },
-            Some(string) => {
-                string.parse_bit_rate()
-            }
+            None => None,
+            Some(string) => string.parse_bit_rate(),
         }
     }
 }
 
 impl HasBitRate for str {
     fn parse_bit_rate(&self) -> Option<f32> {
-        lazy_static!{
+        lazy_static! {
             static ref PATTERN: Regex = Regex::new(r"^\s*(\d*\.?\d+)\s*Kbit/s\s*$").unwrap();
         };
         match PATTERN.captures(self) {
-            None => {
-                None
-            },
+            None => None,
             Some(captures) => {
                 let kbps_string = &captures[0];
                 match f32::from_str(kbps_string) {
-                    Ok(kbps) => {
-                        Some(kbps)
-                    },
+                    Ok(kbps) => Some(kbps),
                     Err(e) => {
                         warn!("Got error {:?} while parsing Kbps", &e);
                         None
                     }
-
                 }
             }
         }
@@ -108,8 +97,10 @@ fn ffprobe_data(path: &String) -> Option<serde_json::Value> {
     trace!("ffprobe {}", &path);
     let captured = Exec::cmd("ffprobe")
         .arg("-show_streams")
-        .arg("-loglevel").arg("error")
-        .arg("-print_format").arg("json")
+        .arg("-loglevel")
+        .arg("error")
+        .arg("-print_format")
+        .arg("json")
         .arg(&path)
         .stdout(Redirection::Pipe)
         .stderr(Redirection::Pipe)

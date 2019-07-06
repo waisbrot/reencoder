@@ -2,7 +2,10 @@ use postgres::Connection;
 use std::thread::sleep;
 use std::time::Duration;
 
-pub trait Module where Self: std::marker::Sync {
+pub trait Module
+where
+    Self: std::marker::Sync,
+{
     fn module_name(&self) -> &str;
     fn module_iteration(&self, connection: &Connection) -> ();
     fn module_loop(&self, connection: Connection) -> () {
@@ -15,7 +18,11 @@ pub trait Module where Self: std::marker::Sync {
     }
     fn config_string(&self, connection: &Connection, key: &str) -> String {
         let name = self.module_name();
-        let s: String = connection.query("SELECT (config->$1)::text FROM config WHERE service = $2", &[&key, &name])
+        let s: String = connection
+            .query(
+                "SELECT (config->$1)::text FROM config WHERE service = $2",
+                &[&key, &name],
+            )
             .unwrap()
             .get(0)
             .get(0);
@@ -23,7 +30,11 @@ pub trait Module where Self: std::marker::Sync {
     }
     fn config_int(&self, connection: &Connection, key: &str) -> i32 {
         let name = self.module_name();
-        connection.query("SELECT (config->$1)::int FROM config WHERE service = $2", &[&key, &name])
+        connection
+            .query(
+                "SELECT (config->$1)::int FROM config WHERE service = $2",
+                &[&key, &name],
+            )
             .unwrap()
             .get(0)
             .get(0)

@@ -1,11 +1,11 @@
-mod file;
 mod ffprobe;
+mod file;
 
-use std::io;
-use std::path::Path;
-use std::fs::{self, DirEntry};
 use file::ScannedFile;
 use postgres::Connection;
+use std::fs::{self, DirEntry};
+use std::io;
+use std::path::Path;
 
 // code from the Rust book
 fn visit_dirs(dir: &Path, visitor: &Fn(&DirEntry) -> io::Result<()>) -> io::Result<()> {
@@ -18,7 +18,7 @@ fn visit_dirs(dir: &Path, visitor: &Fn(&DirEntry) -> io::Result<()>) -> io::Resu
             let metadata = path.symlink_metadata()?;
             let file_type = metadata.file_type();
             if file_type.is_symlink() {
-                continue
+                continue;
             } else {
                 visitor(&entry)?;
             }
@@ -37,7 +37,7 @@ fn scan(root: &String, connection: &Connection) -> io::Result<()> {
             Ok(i) => {
                 debug!("Wrote {} rows for {}", &i, &file.path);
                 Ok(())
-            },
+            }
             Err(e) => {
                 warn!("Error {} while trying to store file {:?}", &e, &file);
                 Ok(())
@@ -61,7 +61,10 @@ impl crate::module::Module for Scan {
     }
     fn module_iteration(&self, connection: &Connection) -> () {
         let mut i = 0;
-        for row in &connection.query("SELECT root FROM roots WHERE active ORDER BY root ASC", &[]).unwrap() {
+        for row in &connection
+            .query("SELECT root FROM roots WHERE active ORDER BY root ASC", &[])
+            .unwrap()
+        {
             let root: String = row.get(0);
             scan(&root, connection).unwrap();
             i += 1;

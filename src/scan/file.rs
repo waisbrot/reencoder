@@ -1,16 +1,16 @@
-use std::fs::File;
-use chrono::DateTime;
-use chrono::offset::Local;
-use crypto::sha3::Sha3;
-use std::path::Path;
-use postgres;
-use postgres::rows::Rows;
-use postgres::rows::Row;
-use std::cmp::{min, max};
-use std::io::Result;
-use std::io::Read;
-use crypto::digest::Digest;
 use crate::scan::ffprobe;
+use chrono::offset::Local;
+use chrono::DateTime;
+use crypto::digest::Digest;
+use crypto::sha3::Sha3;
+use postgres;
+use postgres::rows::Row;
+use postgres::rows::Rows;
+use std::cmp::{max, min};
+use std::fs::File;
+use std::io::Read;
+use std::io::Result;
+use std::path::Path;
 
 const FILE_SAMPLE_LENGTH: usize = 1024;
 
@@ -42,7 +42,12 @@ impl ScannedFile {
         let existing_files = connection.query("SELECT hash, last_modified, codec, height, width, kbps, extension, bytes FROM paths WHERE path = $1", &[&path_string])?;
         Self::new_from_result(&mut file, path_string, last_modified, &existing_files)
     }
-    fn new_from_result(file: &mut File, path_string: String, last_modified: DateTime<Local>, existing_files: &Rows) -> Result<ScannedFile> {
+    fn new_from_result(
+        file: &mut File,
+        path_string: String,
+        last_modified: DateTime<Local>,
+        existing_files: &Rows,
+    ) -> Result<ScannedFile> {
         if existing_files.is_empty() {
             Self::new_from_file(file, path_string, last_modified, Some(Operation::INSERT))
         } else {
@@ -55,20 +60,43 @@ impl ScannedFile {
                 debug!("Last modified in the DB is newer or same; no change");
                 Self::new_from_row(&found, path_string, None)
             } else {
-                debug!("Last modified in the DB is older ({} < {}); needs update", &db_last_modified, &last_modified);
+                debug!(
+                    "Last modified in the DB is older ({} < {}); needs update",
+                    &db_last_modified, &last_modified
+                );
                 Self::new_from_file(file, path_string, last_modified, Some(Operation::UPDATE))
             }
         }
     }
-    fn new_from_file(file: &mut File, path_string: String, last_modified: DateTime<Local>, operation: Option<Operation>) -> Result<ScannedFile> {
+    fn new_from_file(
+        file: &mut File,
+        path_string: String,
+        last_modified: DateTime<Local>,
+        operation: Option<Operation>,
+    ) -> Result<ScannedFile> {
         let hash = hash(file)?;
         let path = path_string;
         let (codec, height, width, kbps) = ffprobe::probe(&path)?;
         let extension = file_extension(&path);
         let bytes = file_bytes(&file);
-        Ok(ScannedFile { hash, path, codec, height, width, kbps, extension, bytes, last_modified, operation })
+        Ok(ScannedFile {
+            hash,
+            path,
+            codec,
+            height,
+            width,
+            kbps,
+            extension,
+            bytes,
+            last_modified,
+            operation,
+        })
     }
-    fn new_from_row(row: &Row, path_string: String, operation: Option<Operation>) -> Result<ScannedFile> {
+    fn new_from_row(
+        row: &Row,
+        path_string: String,
+        operation: Option<Operation>,
+    ) -> Result<ScannedFile> {
         let hash = row.get("hash");
         let last_modified = row.get("last_modified");
         let codec = row.get("codec");
@@ -78,7 +106,18 @@ impl ScannedFile {
         let extension = row.get("extension");
         let bytes = row.get("bytes");
         let path = path_string;
-        Ok(ScannedFile { hash, path, codec, height, width, kbps, extension, bytes, last_modified, operation })
+        Ok(ScannedFile {
+            hash,
+            path,
+            codec,
+            height,
+            width,
+            kbps,
+            extension,
+            bytes,
+            last_modified,
+            operation,
+        })
     }
     pub fn store(&self, connection: &postgres::Connection) -> postgres::Result<u64> {
         match &self.operation {
@@ -91,15 +130,11 @@ impl ScannedFile {
 
 fn file_extension(path: &String) -> Option<String> {
     match Path::new(&path).extension() {
-        None => {
-            None
+        None => None,
+        Some(os_str) => match os_str.to_os_string().into_string() {
+            Ok(string) => Some(string),
+            Err(_) => None,
         },
-        Some(os_str) => {
-            match os_str.to_os_string().into_string() {
-                Ok(string) => Some(string),
-                Err(_) => None
-            }
-        }
     }
 }
 
@@ -110,9 +145,15 @@ fn last_modified(file: &File) -> Result<DateTime<Local>> {
     match (created, modified) {
         (Ok(t), Err(_)) => Ok(DateTime::<Local>::from(t)),
         (Err(_), Ok(t)) => Ok(DateTime::<Local>::from(t)),
-        (Ok(t1), Ok(t2)) => Ok(max(DateTime::<Local>::from(t1), DateTime::<Local>::from(t2))),
+        (Ok(t1), Ok(t2)) => Ok(max(
+            DateTime::<Local>::from(t1),
+            DateTime::<Local>::from(t2),
+        )),
         (Err(e1), Err(e2)) => {
-            panic!("created_at says '{}'; modified_at says '{}'. Can't work with no timestamps,", e1, e2);
+            panic!(
+                "created_at says '{}'; modified_at says '{}'. Can't work with no timestamps,",
+                e1, e2
+            );
         }
     }
 }
@@ -127,9 +168,8 @@ fn hash(file: &mut File) -> Result<String> {
     let metadata = file.metadata()?;
     let file_size = metadata.len();
     let read_length: usize = min(file_size as usize, FILE_SAMPLE_LENGTH);
-    let slice = &mut chunk[0 .. read_length];
+    let slice = &mut chunk[0..read_length];
     file.read_exact(slice)?;
     hasher.input(&chunk);
     Ok(hasher.result_str())
 }
-

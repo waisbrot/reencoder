@@ -1,25 +1,27 @@
-extern crate postgres;
-extern crate crypto;
 extern crate chrono;
-#[macro_use] extern crate log;
-#[macro_use] extern crate lazy_static;
-extern crate pretty_env_logger;
-extern crate subprocess;
-extern crate serde_json;
-extern crate regex;
+extern crate crypto;
+extern crate postgres;
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate lazy_static;
 extern crate clap;
 extern crate crossbeam_utils;
+extern crate pretty_env_logger;
+extern crate regex;
+extern crate serde_json;
+extern crate subprocess;
 
-mod scan;
 mod clean;
-mod reencode;
 mod module;
+mod reencode;
+mod scan;
 
-use std::io;
+use clap::{App, Arg};
+use module::Module;
 use postgres::params::Builder;
 use postgres::params::Host::Tcp;
-use clap::{Arg, App};
-use module::Module;
+use std::io;
 
 fn main() -> io::Result<()> {
     pretty_env_logger::init();
@@ -29,34 +31,45 @@ fn main() -> io::Result<()> {
         .version("0.1")
         .author("Nathaniel Waisbrot")
         .about("Find and convert video to hvec")
-        .arg(Arg::with_name("username")
-             .help("Postgres username")
-             .long("username")
-             .takes_value(true)
-             .required(true))
-        .arg(Arg::with_name("password")
-             .help("Postgres password")
-             .long("password")
-             .takes_value(true)
-             .required(true))
-        .arg(Arg::with_name("host")
-             .help("Postgres hostname")
-             .long("host")
-             .takes_value(true)
-             .required(true))
-        .arg(Arg::with_name("modules")
-             .help("Modules to activate")
-             .long("modules")
-             .required(false)
-             .takes_value(true)
-             .multiple(true)
-             .require_delimiter(true)
-             .default_value("scan,clean,reencode"))
+        .arg(
+            Arg::with_name("username")
+                .help("Postgres username")
+                .long("username")
+                .takes_value(true)
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("password")
+                .help("Postgres password")
+                .long("password")
+                .takes_value(true)
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("host")
+                .help("Postgres hostname")
+                .long("host")
+                .takes_value(true)
+                .required(true),
+        )
+        .arg(
+            Arg::with_name("modules")
+                .help("Modules to activate")
+                .long("modules")
+                .required(false)
+                .takes_value(true)
+                .multiple(true)
+                .require_delimiter(true)
+                .default_value("scan,clean,reencode"),
+        )
         .get_matches();
 
     // Postgres setup
     let postgres_config = Builder::new()
-        .user(args.value_of("username").unwrap(), args.value_of("password"))
+        .user(
+            args.value_of("username").unwrap(),
+            args.value_of("password"),
+        )
         .build(Tcp(args.value_of("host").unwrap().to_string()));
 
     // Modules
@@ -67,24 +80,26 @@ fn main() -> io::Result<()> {
     }
 
     let mut all_modules: Vec<&Module> = Vec::new();
-    all_modules.push(&scan::Scan{});
-    all_modules.push(&clean::Clean{});
-    all_modules.push(&reencode::Reencode{});
+    all_modules.push(&scan::Scan {});
+    all_modules.push(&clean::Clean {});
+    all_modules.push(&reencode::Reencode {});
     crossbeam_utils::thread::scope(|scope| {
         for m in all_modules.iter() {
             let name = m.module_name();
             if modules_contains(&modules, name) {
-                let connection = postgres::Connection::connect(postgres_config.clone(), postgres::TlsMode::None).unwrap();
+                let connection =
+                    postgres::Connection::connect(postgres_config.clone(), postgres::TlsMode::None)
+                        .unwrap();
                 info!("Starting thread {}", &name);
                 scope
                     .builder()
                     .name(name.to_string())
-                    .spawn(move |_| {
-                        m.module_loop(connection)
-                    }).unwrap();
+                    .spawn(move |_| m.module_loop(connection))
+                    .unwrap();
             }
         }
-    }).unwrap();
+    })
+    .unwrap();
 
     info!("All modules have been skipped or failed. END OF LINE");
     Ok(())

@@ -14,7 +14,12 @@ impl crate::module::Module for Clean {
         while !done {
             done = true;
             debug!("Selecting paths");
-            let rows = connection.query("SELECT path FROM paths ORDER BY path DESC OFFSET $1::int4 LIMIT $2::int4", &[&offset, &limit]).unwrap();
+            let rows = connection
+                .query(
+                    "SELECT path FROM paths ORDER BY path DESC OFFSET $1::int4 LIMIT $2::int4",
+                    &[&offset, &limit],
+                )
+                .unwrap();
             debug!("Got {:?}", rows);
             for row in rows.iter() {
                 done = false;
@@ -22,7 +27,9 @@ impl crate::module::Module for Clean {
                 debug!("Checking {}", &path);
                 if !Path::new(&path).is_file() {
                     info!("{} does not exist; removing it from the database", &path);
-                    connection.execute("DELETE FROM paths WHERE path = $1", &[&path]).unwrap();
+                    connection
+                        .execute("DELETE FROM paths WHERE path = $1", &[&path])
+                        .unwrap();
                 }
             }
             offset += limit;

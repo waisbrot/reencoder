@@ -1,10 +1,10 @@
 use postgres::Connection;
+use std::fs;
 use std::path::Path;
 use subprocess::Exec;
 use subprocess::Redirection;
-use std::fs;
 
-pub struct Reencode{}
+pub struct Reencode {}
 impl crate::module::Module for Reencode {
     fn module_name(&self) -> &str {
         "reencode"
@@ -18,7 +18,10 @@ impl crate::module::Module for Reencode {
         let target_codec = self.config_string(&connection, "target_codec");
         while !done {
             done = true;
-            debug!("Selecting paths where extension+codec do not match {}+{}", &target_extension, &target_codec);
+            debug!(
+                "Selecting paths where extension+codec do not match {}+{}",
+                &target_extension, &target_codec
+            );
             let rows = connection.query("SELECT path FROM paths INNER JOIN video_extensions USING(extension) WHERE extension != $1 or codec != $2 ORDER BY path DESC OFFSET $3::int4 LIMIT $4::int4", &[&target_extension, &target_codec, &offset, &limit]).unwrap();
             debug!("Got {:?}", rows);
             offset += limit;
@@ -30,10 +33,14 @@ impl crate::module::Module for Reencode {
                 info!("Converting {}", &source_path);
                 let captured = Exec::cmd("ffmpeg")
                     .arg("-y")
-                    .arg("-loglevel").arg("warning")
-                    .arg("-i").arg(&source_path)
-                    .arg("-c:v").arg(&target_codec)
-                    .arg("-c:a").arg("aac")
+                    .arg("-loglevel")
+                    .arg("warning")
+                    .arg("-i")
+                    .arg(&source_path)
+                    .arg("-c:v")
+                    .arg(&target_codec)
+                    .arg("-c:a")
+                    .arg("aac")
                     .arg("-hide_banner")
                     .arg("-nostats")
                     .arg(&temp_path)
