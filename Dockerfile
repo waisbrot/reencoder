@@ -5,7 +5,9 @@ RUN mkdir src && echo "fn main() {}" > src/main.rs
 RUN cargo build
 
 FROM rust:1.34 as build
-RUN apt-get update && apt-get install -q -y ffmpeg
+RUN apt-get update \
+  && apt-get install -q -y --no-install-recommends ffmpeg \
+  && rm -rf /var/lib/apt/lists/*
 COPY --from=dependencies /usr/src/app/Cargo.toml /usr/src/app/Cargo.lock ./
 COPY --from=dependencies /usr/local/cargo /usr/local/cargo
 COPY . .
