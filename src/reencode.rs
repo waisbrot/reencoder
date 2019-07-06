@@ -3,19 +3,14 @@ use std::path::Path;
 use subprocess::Exec;
 use subprocess::Redirection;
 use std::fs;
-use cadence::StatsdClient;
-use std::time::SystemTime;
-use std::time::Duration;
-use cadence::prelude::*;
 
 pub struct Reencode{}
 impl crate::module::Module for Reencode {
     fn module_name(&self) -> &str {
         "reencode"
     }
-    fn module_iteration(&self, connection: &Connection, statsd: &StatsdClient) -> () {
+    fn module_iteration(&self, connection: &Connection) -> () {
         info!("Searching for targets to reencode");
-        let zero = Duration::from_secs(0);
         let mut done = false;
         let mut offset: i32 = 0;
         let limit: i32 = 100;
@@ -33,7 +28,6 @@ impl crate::module::Module for Reencode {
                 let target_path = Path::new(&source_path).with_extension(&target_extension);
                 let temp_path = Path::new("/tmp/converting.x").with_extension(&target_extension);
                 info!("Converting {}", &source_path);
-                let conversion_start = SystemTime::now();
                 let captured = Exec::cmd("ffmpeg")
                     .arg("-y")
                     .arg("-loglevel").arg("warning")
@@ -51,13 +45,9 @@ impl crate::module::Module for Reencode {
                     fs::copy(&temp_path, &target_path).unwrap();
                     fs::remove_file(&source_path).unwrap();
                     info!("{} -> {:?}", &source_path, &target_path);
-                    statsd.incr("success").unwrap();
                 } else {
                     warn!("ffmpeg failed: {}", &captured.stderr_str());
-                    statsd.incr("error").unwrap();
                 }
-                let conversion_duration = conversion_start.elapsed().unwrap_or(zero);
-                statsd.time_duration("conversion_time", conversion_duration).unwrap();
             }
         }
         ()

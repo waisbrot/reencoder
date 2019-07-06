@@ -9,7 +9,6 @@ extern crate serde_json;
 extern crate regex;
 extern crate clap;
 extern crate crossbeam_utils;
-extern crate cadence;
 
 mod scan;
 mod clean;
@@ -21,10 +20,10 @@ use postgres::params::Builder;
 use postgres::params::Host::Tcp;
 use clap::{Arg, App};
 use module::Module;
-use cadence::StatsdClient;
 
 fn main() -> io::Result<()> {
     pretty_env_logger::init();
+    info!("Starting main thread");
 
     let args = App::new("Video converter")
         .version("0.1")
@@ -53,21 +52,12 @@ fn main() -> io::Result<()> {
              .multiple(true)
              .require_delimiter(true)
              .default_value("scan,clean,reencode"))
-        .arg(Arg::with_name("statsd-host")
-             .help("hostname:port for StatsD server")
-             .long("statsd-host")
-             .required(false)
-             .takes_value(true)
-             .default_value("localhost:8125"))
         .get_matches();
 
     // Postgres setup
     let postgres_config = Builder::new()
         .user(args.value_of("username").unwrap(), args.value_of("password"))
         .build(Tcp(args.value_of("host").unwrap().to_string()));
-
-    // StatsD setup
-    let statsd_host = args.value_of("statsd-host").unwrap();
 
     // Modules
     let modules = args.values_of("modules").unwrap();
@@ -85,13 +75,12 @@ fn main() -> io::Result<()> {
             let name = m.module_name();
             if modules_contains(&modules, name) {
                 let connection = postgres::Connection::connect(postgres_config.clone(), postgres::TlsMode::None).unwrap();
-                let statsd_prefix = format!("reencode.app.{}", &name);
-                let stats_client = StatsdClient::from_udp_host(&statsd_prefix, statsd_host).unwrap();
+                info!("Starting thread {}", &name);
                 scope
                     .builder()
                     .name(name.to_string())
                     .spawn(move |_| {
-                        m.module_loop(connection, stats_client)
+                        m.module_loop(connection)
                     }).unwrap();
             }
         }

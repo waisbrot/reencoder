@@ -1,14 +1,12 @@
 use postgres::Connection;
 use std::path::Path;
-use cadence::StatsdClient;
-use cadence::prelude::*;
 
 pub struct Clean {}
 impl crate::module::Module for Clean {
     fn module_name(&self) -> &str {
         "clean"
     }
-    fn module_iteration(&self, connection: &Connection, statsd: &StatsdClient) -> () {
+    fn module_iteration(&self, connection: &Connection) -> () {
         info!("Checking all paths for non-existant files");
         let mut done = false;
         let mut offset: i32 = 0;
@@ -25,7 +23,6 @@ impl crate::module::Module for Clean {
                 if !Path::new(&path).is_file() {
                     info!("{} does not exist; removing it from the database", &path);
                     connection.execute("DELETE FROM paths WHERE path = $1", &[&path]).unwrap();
-                    statsd.incr("deleted").unwrap();
                 }
             }
             offset += limit;

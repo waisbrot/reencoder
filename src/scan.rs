@@ -6,8 +6,6 @@ use std::path::Path;
 use std::fs::{self, DirEntry};
 use file::ScannedFile;
 use postgres::Connection;
-use cadence::StatsdClient;
-use cadence::prelude::*;
 
 // code from the Rust book
 fn visit_dirs(dir: &Path, visitor: &Fn(&DirEntry) -> io::Result<()>) -> io::Result<()> {
@@ -29,7 +27,7 @@ fn visit_dirs(dir: &Path, visitor: &Fn(&DirEntry) -> io::Result<()>) -> io::Resu
     Ok(())
 }
 
-fn scan(root: &String, connection: &Connection, _statsd: &StatsdClient) -> io::Result<()> {
+fn scan(root: &String, connection: &Connection) -> io::Result<()> {
     let visitor = |dir: &DirEntry| -> io::Result<()> {
         let path = dir.path();
         let path = path.as_path();
@@ -61,15 +59,14 @@ impl crate::module::Module for Scan {
     fn module_name(&self) -> &str {
         "scan"
     }
-    fn module_iteration(&self, connection: &Connection, statsd: &StatsdClient) -> () {
+    fn module_iteration(&self, connection: &Connection) -> () {
         let mut i = 0;
         for row in &connection.query("SELECT root FROM roots WHERE active ORDER BY root ASC", &[]).unwrap() {
             let root: String = row.get(0);
-            scan(&root, connection, &statsd).unwrap();
+            scan(&root, connection).unwrap();
             i += 1;
         }
         info!("Scanned {} roots", &i);
-        statsd.gauge("roots_total", i).unwrap();
         ()
     }
 }
