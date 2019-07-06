@@ -1,6 +1,6 @@
 # Re-encoder
 
-Walks through video files and re-encodes them as HEVC. 
+Walks through video files and re-encodes them as HEVC.
 
 Primarily a project about learning some new languages (Rust).
 
@@ -26,4 +26,3 @@ docker run -d \
     --username media \
     --modules 'clean,scan,reencode'
 ```
-
