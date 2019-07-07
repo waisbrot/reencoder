@@ -49,9 +49,10 @@ impl crate::module::Module for Reencode {
                     .capture()
                     .unwrap();
                 if captured.success() {
+                    info!("cp {:?} {:?}", &temp_path, &target_path);
                     fs::copy(&temp_path, &target_path).unwrap();
+                    info!("rm {}", &source_path);
                     fs::remove_file(&source_path).unwrap();
-                    info!("{} -> {:?}", &source_path, &target_path);
                 } else {
                     warn!("ffmpeg failed: {}", &captured.stderr_str());
                 }

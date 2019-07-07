@@ -83,9 +83,11 @@ fn main() -> io::Result<()> {
     all_modules.push(&scan::Scan {});
     all_modules.push(&clean::Clean {});
     all_modules.push(&reencode::Reencode {});
+    debug!("Starting threads for {:?}", &modules);
     crossbeam_utils::thread::scope(|scope| {
         for m in all_modules.iter() {
             let name = m.module_name();
+            debug!("Checking if we should start a thread for {}", &name);
             if modules_contains(&modules, name) {
                 let connection =
                     postgres::Connection::connect(postgres_config.clone(), postgres::TlsMode::None)
