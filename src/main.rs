@@ -62,6 +62,13 @@ fn main() -> io::Result<()> {
                 .require_delimiter(true)
                 .default_value("scan,clean,reencode"),
         )
+        .arg(
+            Arg::with_name("loop")
+                .help("Continue to run forever?")
+                .long("loop")
+                .required(false)
+                .takes_value(false),
+        )
         .get_matches();
 
     // Postgres setup
@@ -79,7 +86,8 @@ fn main() -> io::Result<()> {
         modules.clone().filter(|&x| x == target).next().is_some()
     }
 
-    let mut all_modules: Vec<&Module> = Vec::new();
+    let doLoop = args.is_present("loop");
+    let mut all_modules: Vec<&dyn Module> = Vec::new();
     all_modules.push(&scan::Scan {});
     all_modules.push(&clean::Clean {});
     all_modules.push(&reencode::Reencode {});
@@ -89,6 +97,7 @@ fn main() -> io::Result<()> {
             let name = m.module_name();
             debug!("Checking if we should start a thread for {}", &name);
             if modules_contains(&modules, name) {
+                debug!("Connecting to postgres");
                 let connection =
                     postgres::Connection::connect(postgres_config.clone(), postgres::TlsMode::None)
                         .unwrap();
@@ -96,10 +105,11 @@ fn main() -> io::Result<()> {
                 scope
                     .builder()
                     .name(name.to_string())
-                    .spawn(move |_| m.module_loop(connection))
+                    .spawn(move |_| m.module_loop(connection, doLoop))
                     .unwrap();
             }
         }
+        info!("All threads started")
     })
     .unwrap();
 

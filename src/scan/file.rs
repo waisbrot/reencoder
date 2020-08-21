@@ -29,7 +29,7 @@ pub struct ScannedFile {
     width: Option<i32>,
     kbps: Option<f32>,
     extension: Option<String>,
-    bytes: i64,
+    pub bytes: i64,
     last_modified: DateTime<Local>,
     operation: Option<Operation>,
 }

@@ -1,5 +1,5 @@
 mod ffprobe;
-mod file;
+pub(crate) mod file;
 
 use file::ScannedFile;
 use postgres::Connection;
@@ -8,7 +8,7 @@ use std::io;
 use std::path::Path;
 
 // code from the Rust book
-fn visit_dirs(dir: &Path, visitor: &Fn(&DirEntry) -> io::Result<()>) -> io::Result<()> {
+fn visit_dirs(dir: &Path, visitor: &dyn Fn(&DirEntry) -> io::Result<()>) -> io::Result<()> {
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();

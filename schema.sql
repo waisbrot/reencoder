@@ -25,7 +25,8 @@ CREATE TABLE paths (
        kbps real,
        extension text,
        bytes bigint NOT NULL,
-       last_modified timestamp with time zone NOT NULL
+       last_modified timestamp with time zone NOT NULL,
+       in_progress boolean NOT NULL DEFAULT false
 );
 CREATE UNIQUE INDEX paths_path ON paths (path);
 
@@ -42,12 +43,12 @@ CREATE TABLE config (
 INSERT INTO config (service, config) VALUES
 ('scan',
 '{
-  "interval": 60
+  "interval": 3600
 }'::jsonb),
 ('clean',
 '{
-  "interval": 60
-}'::jsonb);
+  "interval": 3600
+}'::jsonb),
 ('reencode',
 '{
   "interval": 60,
