@@ -8,12 +8,12 @@ where
 {
     fn module_name(&self) -> &str;
     fn module_iteration(&self, connection: &Connection) -> ();
-    fn module_loop(&self, connection: Connection, doLoop: bool) -> () {
+    fn module_loop(&self, connection: Connection, do_loop: bool) -> () {
         loop {
             let interval_s = self.config_int(&connection, "interval");
             let interval = Duration::from_secs(interval_s as u64);
             self.module_iteration(&connection);
-            if (doLoop) {
+            if do_loop {
                 sleep(interval);
             } else {
                 break;

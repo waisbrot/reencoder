@@ -39,19 +39,22 @@ impl crate::module::Module for Reencode {
             for row in rows.iter() {
                 // always just one unless its zero
                 done = false;
-                let id: i64 = row.get(0);
+                let _id: i64 = row.get(0);
                 let source_path_s: String = row.get(1);
                 let source_path = Path::new(&source_path_s);
+                let source_temp_path = Path::new("/tmp/in");
                 let original_bytes: i64 = row.get(2);
                 let target_path = source_path.with_extension(&target_extension);
                 let temp_path = Path::new("/tmp/converting.x").with_extension(&target_extension);
+                info!("Copy {:?} to temp", &source_path);
+                fs::copy(&source_path, &source_temp_path).unwrap();
                 info!("Converting {:?}", &source_path);
                 let captured = Exec::cmd("ffmpeg")
                     .arg("-y")
                     .arg("-loglevel")
                     .arg("warning")
                     .arg("-i")
-                    .arg(&source_path_s) // danger!
+                    .arg(source_temp_path.to_str().unwrap().to_string())
                     .arg("-c:v")
                     .arg(&target_codec)
                     .arg("-c:a")
@@ -73,10 +76,11 @@ impl crate::module::Module for Reencode {
                         new_file.bytes,
                         new_file.bytes - original_bytes
                     );
-                    new_file.store(&connection);
+                    let _store_result = new_file.store(&connection);
                     if source_path != target_path {
                         info!("rm {:?}", &source_path);
                         fs::remove_file(&source_path).unwrap();
+                        fs::remove_file(&source_temp_path).unwrap();
                     }
                 } else {
                     warn!("ffmpeg failed: {}", &captured.stderr_str());

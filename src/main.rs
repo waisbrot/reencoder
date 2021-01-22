@@ -86,7 +86,7 @@ fn main() -> io::Result<()> {
         modules.clone().filter(|&x| x == target).next().is_some()
     }
 
-    let doLoop = args.is_present("loop");
+    let do_loop = args.is_present("loop");
     let mut all_modules: Vec<&dyn Module> = Vec::new();
     all_modules.push(&scan::Scan {});
     all_modules.push(&clean::Clean {});
@@ -105,7 +105,7 @@ fn main() -> io::Result<()> {
                 scope
                     .builder()
                     .name(name.to_string())
-                    .spawn(move |_| m.module_loop(connection, doLoop))
+                    .spawn(move |_| m.module_loop(connection, do_loop))
                     .unwrap();
             }
         }

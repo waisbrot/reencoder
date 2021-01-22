@@ -18,7 +18,7 @@ repos:
   - id: check-yaml
     stages: [commit]
 - repo: https://github.com/doublify/pre-commit-rust
-  rev: ebc9050d3d3434417feff68e3d847ad4123f5ba8
+  rev: v1.0
   hooks:
     - id: fmt
     - id: cargo-check
