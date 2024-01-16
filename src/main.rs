@@ -5,6 +5,8 @@ extern crate postgres;
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate prometheus;
 extern crate clap;
 extern crate crossbeam_utils;
 extern crate pretty_env_logger;

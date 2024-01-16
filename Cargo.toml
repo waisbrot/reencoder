@@ -17,8 +17,8 @@ clap = "^2.33"
 crossbeam-utils = "^0.8"
 
 [dependencies.postgres]
-version = "^0.15"
-features = ["with-chrono", "with-serde_json"]
+version = "^0.19"
+features = ["with-chrono-0_4", "with-serde_json-1"]
 
 [profile.release]
 opt-level = 0
@@ -29,3 +29,4 @@ codegen-units = 16
 overflow-checks = true
 lto = false
 incremental = false
+
