@@ -21,8 +21,7 @@ mod scan;
 
 use clap::{App, Arg};
 use module::Module;
-use postgres::params::Builder;
-use postgres::params::Host::Tcp;
+use postgres::Client;
 use std::io;
 
 fn main() -> io::Result<()> {
@@ -74,12 +73,11 @@ fn main() -> io::Result<()> {
         .get_matches();
 
     // Postgres setup
-    let postgres_config = Builder::new()
-        .user(
-            args.value_of("username").unwrap(),
-            args.value_of("password"),
-        )
-        .build(Tcp(args.value_of("host").unwrap().to_string()));
+    let mut postgres_config = Client::configure();
+    postgres_config
+        .user(args.value_of("username").unwrap())
+        .password(args.value_of("password").unwrap())
+        .host(args.value_of("host").unwrap());
 
     // Modules
     let modules = args.values_of("modules").unwrap();
@@ -100,14 +98,12 @@ fn main() -> io::Result<()> {
             debug!("Checking if we should start a thread for {}", &name);
             if modules_contains(&modules, name) {
                 debug!("Connecting to postgres");
-                let connection =
-                    postgres::Connection::connect(postgres_config.clone(), postgres::TlsMode::None)
-                        .unwrap();
+                let mut connection = postgres_config.connect(postgres::NoTls).unwrap();
                 info!("Starting thread {}", &name);
                 scope
                     .builder()
                     .name(name.to_string())
-                    .spawn(move |_| m.module_loop(connection, do_loop))
+                    .spawn(move |_| m.module_loop(&mut connection, do_loop))
                     .unwrap();
             }
         }

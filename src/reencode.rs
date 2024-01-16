@@ -1,5 +1,5 @@
 use crate::scan::file::ScannedFile;
-use postgres::Connection;
+use postgres::Client;
 use std::fs;
 use std::path::Path;
 use subprocess::Exec;
@@ -10,11 +10,11 @@ impl crate::module::Module for Reencode {
     fn module_name(&self) -> &str {
         "reencode"
     }
-    fn module_iteration(&self, connection: &Connection) -> () {
+    fn module_iteration(&self, connection: &mut Client) -> () {
         info!("Searching for targets to reencode");
         let mut done = false;
-        let target_extension = self.config_string(&connection, "target_extension");
-        let target_codec = self.config_string(&connection, "target_codec");
+        let target_extension = self.config_string(connection, "target_extension");
+        let target_codec = self.config_string(connection, "target_codec");
         while !done {
             done = true;
             debug!(
@@ -69,14 +69,14 @@ impl crate::module::Module for Reencode {
                 if captured.success() {
                     info!("cp {:?} {:?}", &temp_path, &target_path);
                     fs::copy(&temp_path, &target_path).unwrap();
-                    let new_file = ScannedFile::new(&target_path, &connection).unwrap();
+                    let new_file = ScannedFile::new(&target_path, connection).unwrap();
                     info!(
                         "Bytes {:?} -> {:?} = {:?}",
                         original_bytes,
                         new_file.bytes,
                         new_file.bytes - original_bytes
                     );
-                    let _store_result = new_file.store(&connection);
+                    let _store_result = new_file.store(connection);
                     if source_path != target_path {
                         info!("rm {:?}", &source_path);
                         fs::remove_file(&source_path).unwrap();

@@ -1,4 +1,4 @@
-use postgres::Connection;
+use postgres::Client;
 use std::path::Path;
 
 pub struct Clean {}
@@ -6,7 +6,7 @@ impl crate::module::Module for Clean {
     fn module_name(&self) -> &str {
         "clean"
     }
-    fn module_iteration(&self, connection: &Connection) -> () {
+    fn module_iteration(&self, connection: &mut Client) -> () {
         info!("Checking all paths for non-existant files");
         let mut done = false;
         let mut offset: i32 = 0;

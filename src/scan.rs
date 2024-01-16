@@ -2,13 +2,16 @@ mod ffprobe;
 pub(crate) mod file;
 
 use file::ScannedFile;
-use postgres::Connection;
+use postgres::Client;
+use std::error::Error;
 use std::fs::{self, DirEntry};
-use std::io;
 use std::path::Path;
 
 // code from the Rust book
-fn visit_dirs(dir: &Path, visitor: &dyn Fn(&DirEntry) -> io::Result<()>) -> io::Result<()> {
+fn visit_dirs(
+    dir: &Path,
+    visitor: &mut dyn FnMut(&DirEntry) -> Result<(), Box<dyn Error>>,
+) -> Result<(), Box<dyn Error>> {
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
@@ -27,12 +30,12 @@ fn visit_dirs(dir: &Path, visitor: &dyn Fn(&DirEntry) -> io::Result<()>) -> io::
     Ok(())
 }
 
-fn scan(root: &String, connection: &Connection) -> io::Result<()> {
-    let visitor = |dir: &DirEntry| -> io::Result<()> {
+fn scan(root: &String, connection: &mut Client) -> Result<(), Box<dyn Error>> {
+    let mut visitor = |dir: &DirEntry| -> Result<(), Box<dyn Error>> {
         let path = dir.path();
         let path = path.as_path();
-        let file = ScannedFile::new(path, &connection)?;
-        let result = file.store(&connection);
+        let file = ScannedFile::new(path, connection)?;
+        let result = file.store(connection);
         match result {
             Ok(i) => {
                 debug!("Wrote {} rows for {}", &i, &file.path);
@@ -47,7 +50,7 @@ fn scan(root: &String, connection: &Connection) -> io::Result<()> {
     let root_path = Path::new(root);
     if root_path.is_dir() {
         info!("Scanning from {}", &root);
-        visit_dirs(Path::new(root), &visitor)?;
+        visit_dirs(Path::new(root), &mut visitor)?;
     } else {
         warn!("Root path {} does not appear to be a directory", &root);
     }
@@ -59,7 +62,7 @@ impl crate::module::Module for Scan {
     fn module_name(&self) -> &str {
         "scan"
     }
-    fn module_iteration(&self, connection: &Connection) -> () {
+    fn module_iteration(&self, connection: &mut Client) -> () {
         let mut i = 0;
         for row in &connection
             .query("SELECT root FROM roots WHERE active ORDER BY root ASC", &[])

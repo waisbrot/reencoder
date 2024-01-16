@@ -4,12 +4,11 @@ use chrono::DateTime;
 use crypto::digest::Digest;
 use crypto::sha3::Sha3;
 use postgres;
-use postgres::rows::Row;
-use postgres::rows::Rows;
+use postgres::row::Row;
 use std::cmp::{max, min};
+use std::error::Error;
 use std::fs::File;
 use std::io::Read;
-use std::io::Result;
 use std::path::Path;
 
 const FILE_SAMPLE_LENGTH: usize = 1024;
@@ -35,30 +34,35 @@ pub struct ScannedFile {
 }
 
 impl ScannedFile {
-    pub fn new(path: &Path, connection: &postgres::Connection) -> Result<ScannedFile> {
+    pub fn new(
+        path: &Path,
+        connection: &mut postgres::Client,
+    ) -> Result<ScannedFile, Box<dyn Error>> {
         let mut file = File::open(path)?;
         let path_string = format!("{}", path.display());
         let last_modified = last_modified(&file)?;
-        let existing_files = connection.query("SELECT hash, last_modified, codec, height, width, kbps, extension, bytes FROM paths WHERE path = $1", &[&path_string])?;
+        let existing_files = connection.query("SELECT hash, last_modified, codec, height, width, kbps, extension, bytes FROM paths WHERE path = $1", &[&path_string])
+            .or(Err("failed to query for known paths"))?;
         Self::new_from_result(&mut file, path_string, last_modified, &existing_files)
     }
     fn new_from_result(
         file: &mut File,
         path_string: String,
         last_modified: DateTime<Local>,
-        existing_files: &Rows,
-    ) -> Result<ScannedFile> {
+        existing_files: &Vec<Row>,
+    ) -> Result<ScannedFile, Box<dyn Error>> {
         if existing_files.is_empty() {
             Self::new_from_file(file, path_string, last_modified, Some(Operation::INSERT))
         } else {
             let found = existing_files.get(0);
-            let db_last_modified: DateTime<Local> = found.get("last_modified");
+            let db_last_modified: DateTime<Local> =
+                found.expect("found no files").get("last_modified");
             // Postgres timestamps are less precise than I get from the OS here, so look only at whole ms resolution
             let delta = last_modified - db_last_modified;
             let delta_ms = delta.num_milliseconds();
             if delta_ms < 1 {
                 debug!("Last modified in the DB is newer or same; no change");
-                Self::new_from_row(&found, path_string, None)
+                Self::new_from_row(&found.expect("found no rows"), path_string, None)
             } else {
                 debug!(
                     "Last modified in the DB is older ({} < {}); needs update",
@@ -73,7 +77,7 @@ impl ScannedFile {
         path_string: String,
         last_modified: DateTime<Local>,
         operation: Option<Operation>,
-    ) -> Result<ScannedFile> {
+    ) -> Result<ScannedFile, Box<dyn Error>> {
         let hash = hash(file)?;
         let path = path_string;
         let (codec, height, width, kbps) = ffprobe::probe(&path)?;
@@ -96,7 +100,7 @@ impl ScannedFile {
         row: &Row,
         path_string: String,
         operation: Option<Operation>,
-    ) -> Result<ScannedFile> {
+    ) -> Result<ScannedFile, Box<dyn Error>> {
         let hash = row.get("hash");
         let last_modified = row.get("last_modified");
         let codec = row.get("codec");
@@ -119,7 +123,10 @@ impl ScannedFile {
             operation,
         })
     }
-    pub fn store(&self, connection: &postgres::Connection) -> postgres::Result<u64> {
+    pub fn store(
+        &self,
+        connection: &mut postgres::Client,
+    ) -> core::result::Result<u64, postgres::Error> {
         match &self.operation {
             Some(Operation::INSERT) => connection.execute("INSERT INTO paths (hash, path, last_modified, codec, height, width, kbps, extension, bytes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)", &[&self.hash, &self.path, &self.last_modified, &self.codec, &self.height, &self.width, &self.kbps, &self.extension, &self.bytes]),
             Some(Operation::UPDATE) => connection.execute("UPDATE paths SET (hash, last_modified) = ($1, $3) WHERE path = $2", &[&self.hash, &self.path, &self.last_modified]),
@@ -138,7 +145,7 @@ fn file_extension(path: &String) -> Option<String> {
     }
 }
 
-fn last_modified(file: &File) -> Result<DateTime<Local>> {
+fn last_modified(file: &File) -> Result<DateTime<Local>, Box<dyn Error>> {
     let metadata = file.metadata()?;
     let created = metadata.created();
     let modified = metadata.modified();
@@ -162,7 +169,7 @@ fn file_bytes(file: &File) -> i64 {
     file.metadata().unwrap().len() as i64
 }
 
-fn hash(file: &mut File) -> Result<String> {
+fn hash(file: &mut File) -> Result<String, Box<dyn Error>> {
     let mut hasher = Sha3::sha3_256();
     let mut chunk: [u8; FILE_SAMPLE_LENGTH] = [0; FILE_SAMPLE_LENGTH];
     let metadata = file.metadata()?;
