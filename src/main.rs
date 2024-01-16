@@ -19,74 +19,77 @@ mod module;
 mod reencode;
 mod scan;
 
-use clap::{App, Arg};
+use clap::{parser::ValuesRef, Arg, ArgAction, Command};
 use module::Module;
 use postgres::Client;
-use std::io;
+use std::{io, string};
 
 fn main() -> io::Result<()> {
     pretty_env_logger::init();
     info!("Starting main thread");
 
-    let args = App::new("Video converter")
+    let args = Command::new("Video converter")
         .version("0.1")
         .author("Nathaniel Waisbrot")
         .about("Find and convert video to hvec")
         .arg(
-            Arg::with_name("username")
+            Arg::new("username")
                 .help("Postgres username")
                 .long("username")
-                .takes_value(true)
                 .required(true),
         )
         .arg(
-            Arg::with_name("password")
+            Arg::new("password")
                 .help("Postgres password")
                 .long("password")
-                .takes_value(true)
                 .required(true),
         )
         .arg(
-            Arg::with_name("host")
+            Arg::new("host")
                 .help("Postgres hostname")
                 .long("host")
-                .takes_value(true)
                 .required(true),
         )
         .arg(
-            Arg::with_name("modules")
+            Arg::new("modules")
                 .help("Modules to activate")
                 .long("modules")
                 .required(false)
-                .takes_value(true)
-                .multiple(true)
-                .require_delimiter(true)
+                .value_delimiter(',')
                 .default_value("scan,clean,reencode"),
         )
         .arg(
-            Arg::with_name("loop")
+            Arg::new("loop")
                 .help("Continue to run forever?")
                 .long("loop")
-                .required(false)
-                .takes_value(false),
+                .action(ArgAction::SetTrue)
+                .required(false),
         )
         .get_matches();
 
     // Postgres setup
     let mut postgres_config = Client::configure();
     postgres_config
-        .user(args.value_of("username").unwrap())
-        .password(args.value_of("password").unwrap())
-        .host(args.value_of("host").unwrap());
+        .user(
+            args.get_one::<String>("username")
+                .expect("missing username"),
+        )
+        .password(
+            args.get_one::<String>("password")
+                .expect("missing password"),
+        )
+        .host(args.get_one::<String>("host").expect("missing hostname"));
 
     // Modules
-    let modules = args.values_of("modules").unwrap();
+    let modules = args
+        .get_many::<String>("modules")
+        .expect("missing modules to run");
 
-    fn modules_contains(modules: &clap::Values, target: &str) -> bool {
+    fn modules_contains(modules: &ValuesRef<String>, target: &str) -> bool {
         modules.clone().filter(|&x| x == target).next().is_some()
     }
 
-    let do_loop = args.is_present("loop");
+    let do_loop = args.get_flag("loop");
     let mut all_modules: Vec<&dyn Module> = Vec::new();
     all_modules.push(&scan::Scan {});
     all_modules.push(&clean::Clean {});
