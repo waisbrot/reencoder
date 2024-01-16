@@ -2,7 +2,7 @@
 name = "video-processor"
 version = "1.0.0"
 authors = ["Nathaniel Waisbrot <nathaniel@waisbrot.net>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 rust-crypto = "^0.2"
