@@ -1,10 +1,9 @@
 use crate::scan::ffprobe;
 use chrono::offset::Local;
 use chrono::DateTime;
-use crypto::digest::Digest;
-use crypto::sha3::Sha3;
 use postgres;
 use postgres::row::Row;
+use sha256::Sha256Digest;
 use std::cmp::{max, min};
 use std::error::Error;
 use std::fs::File;
@@ -170,13 +169,11 @@ fn file_bytes(file: &File) -> i64 {
 }
 
 fn hash(file: &mut File) -> Result<String, Box<dyn Error>> {
-    let mut hasher = Sha3::sha3_256();
     let mut chunk: [u8; FILE_SAMPLE_LENGTH] = [0; FILE_SAMPLE_LENGTH];
     let metadata = file.metadata()?;
     let file_size = metadata.len();
     let read_length: usize = min(file_size as usize, FILE_SAMPLE_LENGTH);
     let slice = &mut chunk[0..read_length];
     file.read_exact(slice)?;
-    hasher.input(&chunk);
-    Ok(hasher.result_str())
+    Ok(slice.digest())
 }

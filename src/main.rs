@@ -1,5 +1,4 @@
 extern crate chrono;
-extern crate crypto;
 extern crate postgres;
 #[macro_use]
 extern crate log;
