@@ -1,7 +1,6 @@
 use crate::scan::ffprobe;
 use chrono::offset::Local;
 use chrono::DateTime;
-use postgres;
 use postgres::row::Row;
 use sha256::Sha256Digest;
 use std::cmp::{max, min};
@@ -12,6 +11,7 @@ use std::path::Path;
 
 const FILE_SAMPLE_LENGTH: usize = 1024;
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 enum Operation {
     INSERT,
@@ -53,15 +53,14 @@ impl ScannedFile {
         if existing_files.is_empty() {
             Self::new_from_file(file, path_string, last_modified, Some(Operation::INSERT))
         } else {
-            let found = existing_files.get(0);
-            let db_last_modified: DateTime<Local> =
-                found.expect("found no files").get("last_modified");
+            let found = existing_files.first().expect("found no files");
+            let db_last_modified: DateTime<Local> = found.get("last_modified");
             // Postgres timestamps are less precise than I get from the OS here, so look only at whole ms resolution
             let delta = last_modified - db_last_modified;
             let delta_ms = delta.num_milliseconds();
             if delta_ms < 1 {
                 debug!("Last modified in the DB is newer or same; no change");
-                Self::new_from_row(&found.expect("found no rows"), path_string, None)
+                Self::new_from_row(found, path_string, None)
             } else {
                 debug!(
                     "Last modified in the DB is older ({} < {}); needs update",
@@ -79,16 +78,16 @@ impl ScannedFile {
     ) -> Result<ScannedFile, Box<dyn Error>> {
         let hash = hash(file)?;
         let path = path_string;
-        let (codec, height, width, kbps) = ffprobe::probe(&path)?;
+        let info = ffprobe::probe(&path)?;
         let extension = file_extension(&path);
-        let bytes = file_bytes(&file);
+        let bytes = file_bytes(file);
         Ok(ScannedFile {
             hash,
             path,
-            codec,
-            height,
-            width,
-            kbps,
+            codec: info.codec,
+            height: info.height,
+            width: info.width,
+            kbps: info.bit_rate,
             extension,
             bytes,
             last_modified,

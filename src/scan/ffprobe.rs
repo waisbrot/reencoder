@@ -1,53 +1,58 @@
 use regex::Regex;
-use std::io::Result;
+use std::error::Error;
 use std::str::FromStr;
 use subprocess::Exec;
 use subprocess::Redirection;
 
+#[derive(Default)]
+pub struct ProbedInfo {
+    pub codec: Option<String>,
+    pub height: Option<i32>,
+    pub width: Option<i32>,
+    pub bit_rate: Option<f32>,
+}
+
+type ProbeInfoResult = Result<ProbedInfo, Box<dyn Error>>;
+
 trait ProbeResult {
-    fn unpack_probe_result(
-        &self,
-    ) -> Result<(Option<String>, Option<i32>, Option<i32>, Option<f32>)>;
+    fn unpack_probe_result(&self) -> ProbeInfoResult;
 }
 
 impl ProbeResult for Option<serde_json::Value> {
-    fn unpack_probe_result(
-        &self,
-    ) -> Result<(Option<String>, Option<i32>, Option<i32>, Option<f32>)> {
+    fn unpack_probe_result(&self) -> ProbeInfoResult {
         match self {
-            None => Ok((None, None, None, None)),
+            None => Ok(ProbedInfo {
+                ..Default::default()
+            }),
             Some(value) => value.unpack_probe_result(),
         }
     }
 }
 
 impl ProbeResult for serde_json::Value {
-    fn unpack_probe_result(
-        &self,
-    ) -> Result<(Option<String>, Option<i32>, Option<i32>, Option<f32>)> {
+    fn unpack_probe_result(&self) -> ProbeInfoResult {
         let bit_rate = self.get("bit_rate").parse_bit_rate();
         let codec = match self.get("codec_name") {
             None => None,
-            Some(codec_name) => match codec_name.as_str() {
-                None => None,
-                Some(str_string) => Some(str_string.to_string()),
-            },
+            Some(codec_name) => codec_name.as_str().map(|s| s.to_string()),
         };
         let height = option_downcast(self.get("height").unwrap().as_i64());
         let width = option_downcast(self.get("width").unwrap().as_i64());
-        Ok((codec, height, width, bit_rate))
+        Ok(ProbedInfo {
+            codec,
+            height,
+            width,
+            bit_rate,
+        })
     }
 }
 
-pub fn probe(path: &String) -> Result<(Option<String>, Option<i32>, Option<i32>, Option<f32>)> {
+pub fn probe(path: &String) -> ProbeInfoResult {
     ffprobe_data(path).unpack_probe_result()
 }
 
 fn option_downcast(value: Option<i64>) -> Option<i32> {
-    match value {
-        None => None,
-        Some(n) => Some(n as i32),
-    }
+    value.map(|n| n as i32)
 }
 
 trait HasBitRate {
@@ -101,7 +106,7 @@ fn ffprobe_data(path: &String) -> Option<serde_json::Value> {
         .arg("error")
         .arg("-print_format")
         .arg("json")
-        .arg(&path)
+        .arg(path)
         .stdout(Redirection::Pipe)
         .stderr(Redirection::Pipe)
         .capture()

@@ -10,7 +10,7 @@ impl crate::module::Module for Reencode {
     fn module_name(&self) -> &str {
         "reencode"
     }
-    fn module_iteration(&self, connection: &mut Client) -> () {
+    fn module_iteration(&self, connection: &mut Client) {
         info!("Searching for targets to reencode");
         let mut done = false;
         let target_extension = self.config_string(connection, "target_extension");
@@ -47,14 +47,20 @@ impl crate::module::Module for Reencode {
                 let target_path = source_path.with_extension(&target_extension);
                 let temp_path = Path::new("/tmp/converting.x").with_extension(&target_extension);
                 info!("Copy {:?} to temp", &source_path);
-                fs::copy(&source_path, &source_temp_path).unwrap();
+                fs::copy(source_path, source_temp_path).unwrap_or_else(|_| {
+                    panic!("failed to copy {:?} to {:?}", source_path, source_temp_path)
+                });
                 info!("Converting {:?}", &source_path);
                 let captured = Exec::cmd("ffmpeg")
                     .arg("-y")
                     .arg("-loglevel")
                     .arg("warning")
                     .arg("-i")
-                    .arg(source_temp_path.to_str().unwrap().to_string())
+                    .arg(
+                        source_temp_path
+                            .to_str()
+                            .expect("Could not convert source_temp_path to a string"),
+                    )
                     .arg("-c:v")
                     .arg(&target_codec)
                     .arg("-c:a")
@@ -79,14 +85,16 @@ impl crate::module::Module for Reencode {
                     let _store_result = new_file.store(connection);
                     if source_path != target_path {
                         info!("rm {:?}", &source_path);
-                        fs::remove_file(&source_path).unwrap();
-                        fs::remove_file(&source_temp_path).unwrap();
+                        fs::remove_file(source_path)
+                            .unwrap_or_else(|_| panic!("failed to remove file {:?}", source_path));
+                        fs::remove_file(source_temp_path).unwrap_or_else(|_| {
+                            panic!("failed to remove file {:?}", source_temp_path)
+                        });
                     }
                 } else {
                     warn!("ffmpeg failed: {}", &captured.stderr_str());
                 }
             }
         }
-        ()
     }
 }

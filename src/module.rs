@@ -7,8 +7,8 @@ where
     Self: std::marker::Sync,
 {
     fn module_name(&self) -> &str;
-    fn module_iteration(&self, connection: &mut Client) -> ();
-    fn module_loop(&self, connection: &mut Client, do_loop: bool) -> () {
+    fn module_iteration(&self, connection: &mut Client);
+    fn module_loop(&self, connection: &mut Client, do_loop: bool) {
         loop {
             let interval_s = self.config_int(connection, "interval");
             let interval = Duration::from_secs(interval_s as u64);
@@ -27,9 +27,9 @@ where
                 "SELECT (config->$1)::text FROM config WHERE service = $2",
                 &[&key, &name],
             )
-            .unwrap()
-            .get(0)
-            .unwrap()
+            .expect("Query failed")
+            .first()
+            .expect("Did not get any rows from query")
             .get(0);
         s.trim_matches('"').to_string()
     }
@@ -40,9 +40,9 @@ where
                 "SELECT (config->$1)::int FROM config WHERE service = $2",
                 &[&key, &name],
             )
-            .unwrap()
-            .get(0)
-            .unwrap()
+            .expect("Query failed")
+            .first()
+            .expect("Did not get any rows from query")
             .get(0)
     }
 }

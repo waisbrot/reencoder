@@ -6,7 +6,7 @@ impl crate::module::Module for Clean {
     fn module_name(&self) -> &str {
         "clean"
     }
-    fn module_iteration(&self, connection: &mut Client) -> () {
+    fn module_iteration(&self, connection: &mut Client) {
         info!("Checking all paths for non-existant files");
         let mut done = false;
         let mut offset: i32 = 0;
@@ -34,6 +34,5 @@ impl crate::module::Module for Clean {
             }
             offset += limit;
         }
-        ()
     }
 }

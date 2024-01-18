@@ -84,14 +84,12 @@ fn main() -> io::Result<()> {
         .expect("missing modules to run");
 
     fn modules_contains(modules: &ValuesRef<String>, target: &str) -> bool {
-        modules.clone().filter(|&x| x == target).next().is_some()
+        modules.clone().any(|x| x == target)
     }
 
     let do_loop = args.get_flag("loop");
-    let mut all_modules: Vec<&dyn Module> = Vec::new();
-    all_modules.push(&scan::Scan {});
-    all_modules.push(&clean::Clean {});
-    all_modules.push(&reencode::Reencode {});
+    let all_modules: Vec<&dyn Module> =
+        vec![&scan::Scan {}, &clean::Clean {}, &reencode::Reencode {}];
     debug!("Starting threads for {:?}", &modules);
     crossbeam_utils::thread::scope(|scope| {
         for m in all_modules.iter() {

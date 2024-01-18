@@ -7,11 +7,10 @@ use std::error::Error;
 use std::fs::{self, DirEntry};
 use std::path::Path;
 
+type VoidResult = Result<(), Box<dyn Error>>;
+
 // code from the Rust book
-fn visit_dirs(
-    dir: &Path,
-    visitor: &mut dyn FnMut(&DirEntry) -> Result<(), Box<dyn Error>>,
-) -> Result<(), Box<dyn Error>> {
+fn visit_dirs(dir: &Path, visitor: &mut dyn FnMut(&DirEntry) -> VoidResult) -> VoidResult {
     for entry in fs::read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
@@ -30,8 +29,8 @@ fn visit_dirs(
     Ok(())
 }
 
-fn scan(root: &String, connection: &mut Client) -> Result<(), Box<dyn Error>> {
-    let mut visitor = |dir: &DirEntry| -> Result<(), Box<dyn Error>> {
+fn scan(root: &String, connection: &mut Client) -> VoidResult {
+    let mut visitor = |dir: &DirEntry| -> VoidResult {
         let path = dir.path();
         let path = path.as_path();
         let file = ScannedFile::new(path, connection)?;
@@ -62,7 +61,7 @@ impl crate::module::Module for Scan {
     fn module_name(&self) -> &str {
         "scan"
     }
-    fn module_iteration(&self, connection: &mut Client) -> () {
+    fn module_iteration(&self, connection: &mut Client) {
         let mut i = 0;
         for row in &connection
             .query("SELECT root FROM roots WHERE active ORDER BY root ASC", &[])
@@ -73,6 +72,5 @@ impl crate::module::Module for Scan {
             i += 1;
         }
         info!("Scanned {} roots", &i);
-        ()
     }
 }
